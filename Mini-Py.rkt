@@ -6,7 +6,7 @@
 ;;Brayan Stiven Acuña Vanegas 1940805
 ;;Victor Daniel Valencia Ñañez - 2026608
 
-;;GITHUB: https://github.com/bluruwu/Taller3-FDLP
+;;GITHUB: https://github.com/bluruwu/Mini-Py
 
 
 ;Especificación Léxica
@@ -14,7 +14,7 @@
 '(
   (white-sp (whitespace) skip)
   (comentario ("//" (arbno (not #\newline))) skip)
-  (identificador ("@" (arbno (or letter digit "?"))) symbol)
+  (identificador (letter (arbno (or letter digit))) symbol)
   (texto ((arbno letter)) string)
   (texto (letter (arbno (or letter digit #\- #\:))) string)
   (texto ( "-" letter (arbno (or letter digit #\- #\:))) string)
@@ -36,29 +36,23 @@
     (expresion ("("expresion primitiva-binaria expresion")") primapp-bin-exp)
     (expresion (primitiva-unaria "("expresion")") primapp-un-exp)
 
-    
-    (expresion ("declarar" "("  (separated-list identificador "=" expresion ";")   ")" "{" expresion"}") variableLocal-exp)
-    (expresion ("procedimiento" "("(separated-list identificador",")")" "haga" expresion "finProc") procedimiento-exp)
-    (expresion ("evaluar" expresion "("(separated-list expresion ",")")" "finEval") app-exp)
-    (expresion ("declaraRec" (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion)  "{" expresion "}") 
-                letrec-exp)
-    
     (expresion ("var" (separated-list identificador "=" expresion ",") "in" expresion) let-exp)
     (expresion ("const" (separated-list identificador "=" expresion ",") "in" expresion) const-exp)
+    (expresion ("rec" (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion) "in" expresion) letrec-exp)
+
     (expresion ("true") bool-lit-true)
     (expresion ("false") bool-litt-false)
+    
+    (expresion ("["(separated-list expresion ",")"]" ) list-exp)
+    (expresion ("registro" "[" identificador ":" expresion (arbno "," identificador ":" expresion)"]" ) registro-exp)
+    (expresion ("tupla" "(" (separated-list expresion ",") ")" ) tupla-exp)
 
+    (expresion ("begin" expresion (arbno ";" expresion) "end") begin-exp)
+    (expresion ("set" identificador "=" expresion) set-exp)
     (expresion ("if" expresion "then" expresion "else" expresion ) if-exp)
     (expresion ("while" expresion "do" expresion) while-exp)
     (expresion ("for" identificador "=" expresion iterador expresion "do" expresion) for-exp)
-    (expresion ("["(separated-list expresion ",")"]" ) list-exp)
-    (expresion ("tupla" "(" (separated-list expresion ",") ")" ) tupla-exp)
-    (expresion ("registro" "[" identificador ":" expresion (arbno "," identificador ":" expresion)"]" ) registro-exp)
-    
-    (expresion ("begin" expresion (arbno ";" expresion) "end")
-                begin-exp)
-    (expresion ("set" identificador "=" expresion)
-                set-exp)
+    (expresion (iterador expresion "do" expresion "done") do-exp)
     
     (expresion ("vacio?" "(" expresion ")") vacio?-exp)
     (expresion ("vacio") vacio-exp)
@@ -66,36 +60,51 @@
     (expresion ("lista?" "(" expresion ")") list?-exp)
     (expresion ("cabeza" "(" expresion ")") cabeza-exp)
     (expresion ("cola" "(" expresion ")") cola-exp)
+    ;FALTA APPEND 
     (expresion ("ref-lis" "(" expresion "," expresion ")") ref-list-exp)
     (expresion ("set-lis" "(" expresion "," expresion "," expresion ")") set-list-exp)
+  
     (expresion ("crear-tupla" "(" expresion (arbno "," expresion) ")" ) crear-tupla-exp)
     (expresion ("tupla?" "(" expresion ")") tupla?-exp)
     (expresion ("ref-tupla" "(" expresion "," expresion ")" ) ref-tupla-exp)
+    
     (expresion ("registro?" "(" expresion ")") registro?-exp)
     (expresion ("crear-registro" "(" identificador "=" expresion (arbno "," identificador "=" expresion) ")" ) crear-registro-exp)
     (expresion ("ref-register" "(" expresion "," expresion")") ref-registro-exp)
     (expresion ("set-register" "(" expresion "," expresion "," expresion")") set-registro-exp)
-    
-    
-    (primitiva-binaria ("+") primitiva-suma)
-    (primitiva-binaria ("~") primitiva-resta) 
-    (primitiva-binaria ("*") primitiva-multi)
-    (primitiva-binaria ("/") primitiva-div)
-    (primitiva-binaria ("%") primitiva-mod)
-    (primitiva-binaria ("concat") primitiva-concat)
-    (primitiva-binaria ("and") primitiva-and)
-    (primitiva-binaria ("or") primitiva-or)
+
+    ;cambiar forma de procedimiento y evaluar, ponerlo parecido a algun lenguaje conocido, ej: c++
+    (expresion ("procedimiento" "("(separated-list identificador",")")" "haga" expresion "finProc") procedimiento-exp)
+    (expresion ("evaluar" expresion "("(separated-list expresion ",")")" "finEval") app-exp)
+        
+    ;no se si sea necesario hacer un recproc, por favor VERIFICAR.
+
+
     (primitiva-binaria (">") primitiva-mayor)
     (primitiva-binaria (">=") primitiva-mayor-igual)
     (primitiva-binaria ("<") primitiva-menor)
     (primitiva-binaria ("<=") primitiva-menor-igual)
     (primitiva-binaria ("==") primitiva-igual)
+    (primitiva-binaria ("<>") primitiva-no-es-igual)
+    
+    (primitiva-binaria ("and") primitiva-and)
+    (primitiva-binaria ("or") primitiva-or)
+    
     (primitiva-unaria ("not") primitiva-not)
-    (primitiva-unaria ("longitud") primitiva-longitud)
+    
+    (primitiva-binaria ("+") primitiva-suma)
+    (primitiva-binaria ("~") primitiva-resta) 
+    (primitiva-binaria ("*") primitiva-multi)
+    (primitiva-binaria ("/") primitiva-div)
+    (primitiva-binaria ("%") primitiva-mod) 
     (primitiva-unaria ("add1") primitiva-add1)
     (primitiva-unaria ("sub1") primitiva-sub1)
+
+
+    ;HEXADECIMALES FALTA
+    (primitiva-unaria ("longitud") primitiva-longitud)
+    (primitiva-binaria ("concat") primitiva-concat)
     
-  
     (iterador ("to") iter-to)
     (iterador ("downto") iter-down)
     
@@ -168,6 +177,10 @@
 
 ;**************************************************************************************
 
+;FALTA TODO EL EVAL EXPRESION!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
 ;eval-expression: <expression> <enviroment> -> numero | string
 ; evalua la expresión en el ambiente de entrada
 (define evaluar-expresion
@@ -185,10 +198,10 @@
               (if (valor-verdad? (evaluar-expresion test-exp env))
                   (evaluar-expresion true-exp env)
                   (evaluar-expresion false-exp env)))                   
-      (variableLocal-exp (ids rands body)
-               (let ((args (eval-let-exp-rands rands env)))
-                 (evaluar-expresion body
-                                  (extend-env ids args env))))
+   ;   (variableLocal-exp (ids rands body)
+   ;            (let ((args (eval-let-exp-rands rands env)))
+    ;             (evaluar-expresion body
+   ;                               (extend-env ids args env))))
       (procedimiento-exp (ids body)
                 (cerradura ids body env))
       (app-exp (rator rands)
@@ -286,33 +299,6 @@
     (cases reference ref
       (a-ref (pos vec)
              (vector-set! vec pos val)))))
-
-;****************************************************************************************
-
-;***********************Funciones Auxiliares******************************
-
-;Funcion que retorna la posicion en la que el caracter esta ubicado
-(define indice-lista
-  (lambda (pred lst)
-    (indice-lista-aux 0 pred lst)))
-
-;; Función auxiliar que realiza el llamado recursivo utilizando como criterio principal
-;; un contador auxiliar que ayuda a determinar el recorrido dentro de la lista
-(define indice-lista-aux
-  (lambda (n pred lst)
-    (if (null? lst)
-        'NoCumple
-        (if (pred (car lst))
-            n
-            (indice-lista-aux (+ n 1) pred (cdr lst))))))
-
-;buscar-pos
-;Funcion auxiliar que retorna el elemento que está ubicado en la posicion dada
-(define (buscar-pos lst n)
-  (if (zero? n)
-      (car lst)
-      (buscar-pos (cdr lst) (- n 1))))
-
 
 ;******************************************** Ambientes *******************************************
 ;****Gramatica*******
