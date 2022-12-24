@@ -15,9 +15,8 @@
   (white-sp (whitespace) skip)
   (comentario ("//" (arbno (not #\newline))) skip)
   (identificador (letter (arbno (or letter digit))) symbol)
-  (texto ((arbno letter)) string)
-  (texto (letter (arbno (or letter digit #\- #\:))) string)
-  (texto ( "-" letter (arbno (or letter digit #\- #\:))) string)
+  (cadena (letter (arbno (or letter digit #\- #\:))) string)
+  (cadena ( "-" letter (arbno (or letter digit #\- #\:))) string)
   (numero (digit (arbno digit)) number)
   (numero ("-" digit (arbno digit)) number)
   (numero (digit (arbno digit) "." digit (arbno digit)) number)
@@ -29,57 +28,89 @@
 
 (define grammar-simple-interpreter
   '(
+    ;Expresiones basicas
     (programa (expresion) un-programa)
-    (expresion (numero) numero-lit)
+    
+    ;Identificadores
     (expresion (identificador) var-exp)
-    (expresion ("\""texto"\"") texto-lit)
-    (expresion ("("expresion primitiva-binaria expresion")") primapp-bin-exp)
-    (expresion (primitiva-unaria "("expresion")") primapp-un-exp)
-
+    
+    ;Definir variables
     (expresion ("var" (separated-list identificador "=" expresion ",") "in" expresion) let-exp)
     (expresion ("const" (separated-list identificador "=" expresion ",") "in" expresion) const-exp)
     (expresion ("rec" (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion) "in" expresion) letrec-exp)
-
+    
+    ;Datos
+    (expresion (numero) numero-lit)
+    (expresion ("\""cadena "\"") cadena-exp)
+    ;FALTA COMPLETAR BOOLEANOS
+    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    ;Constructores de datos predefinidos
+    (expresion ("["(separated-list expresion ";")"]" ) list-exp)
+    (expresion ("tupla" "[" (separated-list expresion ";") "]" ) tupla-exp)
+    (expresion ("{" identificador "=" expresion (arbno ";" identificador "=" expresion)"}" ) registro-exp)
+    ;FALTA COMPLETAR BOOLEANOS
     (expresion ("true") bool-lit-true)
     (expresion ("false") bool-litt-false)
-    
-    (expresion ("["(separated-list expresion ",")"]" ) list-exp)
-    (expresion ("registro" "[" identificador ":" expresion (arbno "," identificador ":" expresion)"]" ) registro-exp)
-    (expresion ("tupla" "(" (separated-list expresion ",") ")" ) tupla-exp)
+    ;FALTA COMPLETAR BOOLEANOS
+    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+    ;Estructuras de control
     (expresion ("begin" expresion (arbno ";" expresion) "end") begin-exp)
-    (expresion ("set" identificador "=" expresion) set-exp)
     (expresion ("if" expresion "then" expresion "else" expresion ) if-exp)
     (expresion ("while" expresion "do" expresion) while-exp)
-    (expresion ("for" identificador "=" expresion iterador expresion "do" expresion) for-exp)
-    (expresion (iterador expresion "do" expresion "done") do-exp)
+    (expresion ("for" identificador "=" expresion iterador expresion "do" "{" expresion "}" "done") for-exp)
+    (iterador ("to") iter-to)
+    (iterador ("downto") iter-down)
     
+    ;Primitivas aritmeticas para enteros
+    (expresion ("("expresion primitiva-binaria expresion")") primapp-bin-exp)
+    (expresion (primitiva-unaria "("expresion")") primapp-un-exp)
+    
+    ;Primitivas aritmeticas para hexodecimales [FALTA]
+    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    ;Primitivas sobre cadenas
+    (primitiva-unaria ("longitud") primitiva-longitud)
+    (primitiva-binaria ("concat") primitiva-concat)
+    
+    ;Primitivas sobre listas
     (expresion ("vacio?" "(" expresion ")") vacio?-exp)
     (expresion ("vacio") vacio-exp)
     (expresion ("crear-lista" "(" expresion (arbno "," expresion) ")" ) crear-lista-exp)
     (expresion ("lista?" "(" expresion ")") list?-exp)
     (expresion ("cabeza" "(" expresion ")") cabeza-exp)
     (expresion ("cola" "(" expresion ")") cola-exp)
-    ;FALTA APPEND 
+    ;FALTA APPEND
+    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     (expresion ("ref-lis" "(" expresion "," expresion ")") ref-list-exp)
     (expresion ("set-lis" "(" expresion "," expresion "," expresion ")") set-list-exp)
-  
+
+    ;Primitivas sobre tuplas 
     (expresion ("crear-tupla" "(" expresion (arbno "," expresion) ")" ) crear-tupla-exp)
     (expresion ("tupla?" "(" expresion ")") tupla?-exp)
     (expresion ("ref-tupla" "(" expresion "," expresion ")" ) ref-tupla-exp)
-    
+    ;ES POSIBLE QUE TOQUE CREAR VACIO, CABEZA Y COLA PROPIOS PARA TUPLAS. DEJAR ESTE MEN POR SI ALGO
+    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ;Primitivas sobre registros
     (expresion ("registro?" "(" expresion ")") registro?-exp)
     (expresion ("crear-registro" "(" identificador "=" expresion (arbno "," identificador "=" expresion) ")" ) crear-registro-exp)
     (expresion ("ref-register" "(" expresion "," expresion")") ref-registro-exp)
     (expresion ("set-register" "(" expresion "," expresion "," expresion")") set-registro-exp)
 
-    ;cambiar forma de procedimiento y evaluar, ponerlo parecido a algun lenguaje conocido, ej: c++
+    ;Invocación de procedimientos
+    ;CAMBIAR FORMA DE PROCEDIMIENTO Y EVALUAR, PONERLO PARECIDO A ALGUN LENGUAJE CONOCIDO, EJ: C++
+    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     (expresion ("procedimiento" "("(separated-list identificador",")")" "haga" expresion "finProc") procedimiento-exp)
     (expresion ("evaluar" expresion "("(separated-list expresion ",")")" "finEval") app-exp)
         
     ;no se si sea necesario hacer un recproc, por favor VERIFICAR.
+    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    ;Variables actualizables
+    (expresion ("set" identificador "=" expresion) set-exp)
 
-
+    ;<pred−prim>
     (primitiva-binaria (">") primitiva-mayor)
     (primitiva-binaria (">=") primitiva-mayor-igual)
     (primitiva-binaria ("<") primitiva-menor)
@@ -87,11 +118,14 @@
     (primitiva-binaria ("==") primitiva-igual)
     (primitiva-binaria ("<>") primitiva-no-es-igual)
     
+    ;<oper−bin−bool>
     (primitiva-binaria ("and") primitiva-and)
     (primitiva-binaria ("or") primitiva-or)
     
+    ;<oper−un−bool>
     (primitiva-unaria ("not") primitiva-not)
     
+    ;enteros
     (primitiva-binaria ("+") primitiva-suma)
     (primitiva-binaria ("~") primitiva-resta) 
     (primitiva-binaria ("*") primitiva-multi)
@@ -99,14 +133,11 @@
     (primitiva-binaria ("%") primitiva-mod) 
     (primitiva-unaria ("add1") primitiva-add1)
     (primitiva-unaria ("sub1") primitiva-sub1)
-
-
-    ;HEXADECIMALES FALTA
-    (primitiva-unaria ("longitud") primitiva-longitud)
-    (primitiva-binaria ("concat") primitiva-concat)
     
-    (iterador ("to") iter-to)
-    (iterador ("downto") iter-down)
+    ;FALTA HEXADECIMALES
+    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+
     
    )
   )
@@ -178,7 +209,7 @@
 ;**************************************************************************************
 
 ;FALTA TODO EL EVAL EXPRESION!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 ;eval-expression: <expression> <enviroment> -> numero | string
@@ -187,7 +218,7 @@
   (lambda (exp env)
     (cases expresion exp
       (numero-lit (datum) datum)
-      (texto-lit (txt) txt)
+      (cadena-exp (cad) cad)
       (var-exp (id) (apply-env env id))
       (primapp-un-exp (prim rand)
                    (apply-primitive-un prim (evaluar-expresion rand env)))
@@ -197,11 +228,7 @@
       (if-exp (test-exp true-exp false-exp)
               (if (valor-verdad? (evaluar-expresion test-exp env))
                   (evaluar-expresion true-exp env)
-                  (evaluar-expresion false-exp env)))                   
-   ;   (variableLocal-exp (ids rands body)
-   ;            (let ((args (eval-let-exp-rands rands env)))
-    ;             (evaluar-expresion body
-   ;                               (extend-env ids args env))))
+                  (evaluar-expresion false-exp env)))          
       (procedimiento-exp (ids body)
                 (cerradura ids body env))
       (app-exp (rator rands)
