@@ -14,7 +14,7 @@
 '(
   (white-sp (whitespace) skip)
   (comentario ("//" (arbno (not #\newline))) skip)
-  (identificador (letter (arbno (or letter digit))) symbol)
+  (identificador ("@" letter (arbno (or letter digit))) symbol)
   (cadena (letter (arbno (or letter digit #\- #\:))) string)
   (cadena ( "-" letter (arbno (or letter digit #\- #\:))) string)
   (numero (digit (arbno digit)) number)
@@ -32,33 +32,32 @@
     (programa (expresion) un-programa)
     
     ;Identificadores
-    (expresion (identificador) var-exp)
+    (expresion (identificador) id-exp)
     
     ;Definir variables
-    (expresion ("var" (separated-list identificador "=" expresion ",") "in" expresion) let-exp)
+    (expresion ("var" (separated-list identificador "=" expresion ",") "in" expresion) var-exp)
     (expresion ("const" (separated-list identificador "=" expresion ",") "in" expresion) const-exp)
     (expresion ("rec" (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion) "in" expresion) letrec-exp)
     
     ;Datos
     (expresion (numero) numero-lit)
     (expresion ("\""cadena "\"") cadena-exp)
-    ;FALTA COMPLETAR BOOLEANOS
-    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
+    (expresion (expr-bool) exp-bool)
+
     ;Constructores de datos predefinidos
     (expresion ("["(separated-list expresion ";")"]" ) list-exp)
     (expresion ("tupla" "[" (separated-list expresion ";") "]" ) tupla-exp)
     (expresion ("{" identificador "=" expresion (arbno ";" identificador "=" expresion)"}" ) registro-exp)
-    ;FALTA COMPLETAR BOOLEANOS
-    (expresion ("true") bool-lit-true)
-    (expresion ("false") bool-litt-false)
-    ;FALTA COMPLETAR BOOLEANOS
-    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    (expr-bool (pred-prim "(" expresion "," expresion ")") pred-prim-exp) ;DrRacket
+    (expr-bool ("true") bool-lit-true)
+    (expr-bool ("false") bool-lit-false)
+    ;faltan mas boleanos
+
 
     ;Estructuras de control
     (expresion ("begin" expresion (arbno ";" expresion) "end") begin-exp)
-    (expresion ("if" expresion "then" expresion "else" expresion ) if-exp)
-    (expresion ("while" expresion "do" expresion) while-exp)
+    (expresion ("if" expr-bool "then" expresion "else" expresion ) if-exp)
+    (expresion ("while" expr-bool "do" expresion) while-exp)
     (expresion ("for" identificador "=" expresion iterador expresion "do" "{" expresion "}" "done") for-exp)
     (iterador ("to") iter-to)
     (iterador ("downto") iter-down)
@@ -92,6 +91,7 @@
     (expresion ("ref-tupla" "(" expresion "," expresion ")" ) ref-tupla-exp)
     ;ES POSIBLE QUE TOQUE CREAR VACIO, CABEZA Y COLA PROPIOS PARA TUPLAS. DEJAR ESTE MEN POR SI ALGO
     ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
     ;Primitivas sobre registros
     (expresion ("registro?" "(" expresion ")") registro?-exp)
     (expresion ("crear-registro" "(" identificador "=" expresion (arbno "," identificador "=" expresion) ")" ) crear-registro-exp)
@@ -110,20 +110,20 @@
     ;Variables actualizables
     (expresion ("set" identificador "=" expresion) set-exp)
 
-    ;<pred−prim>
-    (primitiva-binaria (">") primitiva-mayor)
-    (primitiva-binaria (">=") primitiva-mayor-igual)
-    (primitiva-binaria ("<") primitiva-menor)
-    (primitiva-binaria ("<=") primitiva-menor-igual)
-    (primitiva-binaria ("==") primitiva-igual)
-    (primitiva-binaria ("<>") primitiva-no-es-igual)
+    ;<pred-prim>
+    (pred-prim (">") mayor-exp)
+    (pred-prim (">=") mayor-igual-exp)
+    (pred-prim ("<") menor-exp)
+    (pred-prim ("<=") menor-igual-exp)
+    (pred-prim ("==") igual-exp)
+    (pred-prim ("!=") diferente-exp) ;c++
     
     ;<oper−bin−bool>
-    (primitiva-binaria ("and") primitiva-and)
-    (primitiva-binaria ("or") primitiva-or)
+    (oper−bin−boo ("and") primitiva-and)
+    (oper−bin−boo ("or") primitiva-or)
     
     ;<oper−un−bool>
-    (primitiva-unaria ("not") primitiva-not)
+    (oper−un−bool ("not") primitiva-not)
     
     ;enteros
     (primitiva-binaria ("+") primitiva-suma)
@@ -137,6 +137,8 @@
     ;FALTA HEXADECIMALES
     ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
+    ;Imprimir
+    (expresion ("print" "(" expresion ")") print-exp)
 
     
    )
@@ -181,19 +183,11 @@
                  (evaluar-expresion body (init-env))))))
 
 ; Ambiente inicial
-;(define init-env
-;  (lambda ()
-;    (extend-env
-;     '(x y z)
-;     '(4 2 5)
-;     (empty-env))))
 (define init-env
   (lambda ()
     (extend-env
-     '(x y z)
-     (list (direct-target 1)
-           (direct-target 5)
-           (direct-target 10))
+     '(@a @b @c @d @e)
+     '(1 2 3 "hola" "FLP")
      (empty-env))))
 
 ;Definición tipos de datos referencia y blanco
@@ -206,12 +200,10 @@
   (a-ref (position integer?)
          (vec vector?)))
 
-;**************************************************************************************
+;**********************************Apply y Evaluar-expresion****************************************************
 
 ;FALTA TODO EL EVAL EXPRESION!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
 ;eval-expression: <expression> <enviroment> -> numero | string
 ; evalua la expresión en el ambiente de entrada
 (define evaluar-expresion
@@ -219,47 +211,20 @@
     (cases expresion exp
       (numero-lit (datum) datum)
       (cadena-exp (cad) cad)
-      (var-exp (id) (apply-env env id))
+      (id-exp (id) (apply-env env id))
+      (var-exp (vars rands body)
+               (let ((args (eval-rands rands env)))
+                 (evaluar-expresion body (extend-env vars args env))))
       (primapp-un-exp (prim rand)
                    (apply-primitive-un prim (evaluar-expresion rand env)))
       (primapp-bin-exp (rand1 prim rand2)
                    (apply-primitive-bin prim (evaluar-expresion rand1 env) (evaluar-expresion rand2 env))
-                   )
-      (if-exp (test-exp true-exp false-exp)
-              (if (valor-verdad? (evaluar-expresion test-exp env))
-                  (evaluar-expresion true-exp env)
-                  (evaluar-expresion false-exp env)))          
-      (procedimiento-exp (ids body)
-                (cerradura ids body env))
-      (app-exp (rator rands)
-               (let ((proc (evaluar-expresion rator env))
-                     (args (eval-rands rands env)))
-                 (if (procVal? proc)
-                     (apply-procedure proc args)
-                     (eopl:error 'eval-expression
-                                 "Attempt to apply non-procedure ~s" proc))))
-      (letrec-exp (proc-names idss bodies letrec-body)
-                  (evaluar-expresion letrec-body
-                                   (extend-env-recursively proc-names idss bodies env)))
-      (set-exp (id rhs-exp)
-               (begin
-                 (setref!
-                  (apply-env-ref env id)
-                  (evaluar-expresion rhs-exp env))
-                 1))
-      (begin-exp (exp exps)
-                 (let loop ((acc (evaluar-expresion exp env))
-                             (exps exps))
-                    (if (null? exps) 
-                        acc
-                        (loop (evaluar-expresion (car exps) 
-                                               env)
-                              (cdr exps)))))
+                   );exp-bool
       (else (eopl:error 'invalid-register "No es un indice de registro valido"))
       )))
 
 
-;apply-primitive-bin: <primitiva> <expresion> <expresion> -> numero | string
+;apply-primitive-bin: <expresion> <primitiva> <expresion> -> numero
 (define apply-primitive-bin
   (lambda (prim args1 args2)
     (cases primitiva-binaria prim
@@ -267,26 +232,37 @@
       (primitiva-resta () (- args1 args2))
       (primitiva-multi () (* args1 args2))
       (primitiva-div () (/ args1 args2))
-      (primitiva-concat () (string-append args1 args2))
-      (else (eopl:error 'invalid-register "No es un indice de registro valido"))
-      )))
+      (primitiva-mod () (modulo args1 args2))
+      (primitiva-concat () (string-append args1 args2)))))
+       ;aqui iria append
+    
 
-;apply-primitive-un: <primitiva> <expresion> <expresion> -> numero
+;apply-primitive-un: <primitiva> <expresion> -> numero
 (define apply-primitive-un
   (lambda (prim args)
     (cases primitiva-unaria prim
-      (primitiva-longitud () (string-length args))
       (primitiva-add1 () (+ args 1))
       (primitiva-sub1 () (- args 1))
-      (else (eopl:error 'invalid-register "No es un indice de registro valido"))
-      )))
+      (primitiva-longitud () (length args)))))
 
-;Blancos y Referencias
+;apply-pred-prim: <primitiva>
+(define apply-pred-prim
+  (lambda (prim args1 args2)
+    (cases pred-prim prim
+      (menor-exp () (< args1 args2))
+      (mayor-exp () (> args1 args2))
+      (menor-igual-exp () (<= args1 args2))
+      (mayor-igual-exp () (>= args1 args2))
+      (igual-exp () (eqv? args1 args2))
+      (diferente-exp () (not (eqv? args1 args2))))))
+
+
+;****************************************Blancos y Referencias **********************************************************************
 
 (define expval?
   (lambda (x)
     (or (number? x) (procVal? x))))
-
+;
 (define ref-to-direct-target?
   (lambda (x)
     (and (reference? x)
@@ -295,7 +271,7 @@
                   (cases target (vector-ref vec pos)
                     (direct-target (v) #t)
                     (indirect-target (v) #f)))))))
-
+;
 (define deref
   (lambda (ref)
     (cases target (primitive-deref ref)
@@ -312,7 +288,7 @@
     (cases reference ref
       (a-ref (pos vec)
              (vector-ref vec pos)))))
-
+;
 (define setref!
   (lambda (ref expval)
     (let
@@ -348,37 +324,17 @@
     (empty-env-record)))       ;llamado al constructor de ambiente vacío 
 
 
+;función que busca un símbolo en un ambiente
+(define apply-env
+  (lambda (env sym)
+      (deref (apply-env-ref env sym))))
+
 ;extend-env: <list-of symbols> <list-of numbers> enviroment -> enviroment
 ;función que crea un ambiente extendido
 (define extend-env
   (lambda (syms vals env)
     (extended-env-record syms (list->vector vals) env)))
 
-;extend-env-recursively: <list-of symbols> <list-of <list-of symbols>> <list-of expressions> environment -> environment
-;función que crea un ambiente extendido para procedimientos recursivos
-(define extend-env-recursively
-  (lambda (proc-names idss bodies old-env)
-    (let ((len (length proc-names)))
-      (let ((vec (make-vector len)))
-        (let ((env (extended-env-record proc-names vec old-env)))
-          (for-each
-            (lambda (pos ids body)
-              (vector-set! vec pos (direct-target (cerradura ids body env))))
-            (iota len) idss bodies)
-          env)))))
-
-;iota: number -> list
-;función que retorna una lista de los números desde 0 hasta end
-(define iota
-  (lambda (end)
-    (let loop ((next 0))
-      (if (>= next end) '()
-        (cons next (loop (+ 1 next)))))))
-
-;función que busca un símbolo en un ambiente
-(define apply-env
-  (lambda (env sym)
-      (deref (apply-env-ref env sym))))
 (define apply-env-ref
   (lambda (env sym)
     (cases environment env
@@ -401,31 +357,18 @@
 (define eval-rands
   (lambda (rands env)
     (map (lambda (x) (eval-rand x env)) rands)))
-;;eval-rand ingresa el operando y lo llama para evaluar la expresion
+
 (define eval-rand
   (lambda (rand env)
-    (cases expresion rand
-      (var-exp (id)
-               (indirect-target
-                (let ((ref (apply-env-ref env id)))
-                  (cases target (primitive-deref ref)
-                    (direct-target (expval) ref)
-                    (indirect-target (ref1) ref1)))))
-      (else
-       (direct-target (evaluar-expresion rand env))))))
+    (evaluar-expresion rand env)))
 
-(define eval-primapp-exp-rands
-  (lambda (rands env)
-    (map (lambda (x) (evaluar-expresion x env)) rands)))
-
-(define eval-let-exp-rands
-  (lambda (rands env)
-    (map (lambda (x) (eval-let-exp-rand x env))
-         rands)))
-
-(define eval-let-exp-rand
-  (lambda (rand env)
-    (direct-target (evaluar-expresion rand env))))
+;Booleanos
+(define eval-expr-bool
+  (lambda (exp env)
+    (cases expr-bool exp
+      (pred-prim-exp (prim args1 args2)(apply-pred-prim prim (evaluar-expresion args1 env) (evaluar-expresion args2 env)))
+      (bool-lit-true () 'true)  
+      (bool-lit-false () 'false))))
 
 ;****************************************************************************************
 ;Funciones Auxiliares
@@ -469,5 +412,5 @@
       (cerradura (ids body env)
                (evaluar-expresion body (extend-env ids args env))))))
 
-;(interpretador)
+(interpretador)
     
