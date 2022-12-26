@@ -103,7 +103,8 @@
     ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     (expresion ("procedimiento" "("(separated-list identificador",")")" "haga" expresion "finProc") procedimiento-exp)
     (expresion ("evaluar" expresion "("(separated-list expresion ",")")" "finEval") app-exp)
-        
+    (expresion ("&" identificador) referencia-exp)
+   
     ;no se si sea necesario hacer un recproc, por favor VERIFICAR.
     ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
@@ -180,20 +181,14 @@
   (lambda (pgm)
     (cases programa pgm
       (un-programa (body)
-                 (evaluar-expresion body (init-env))))))
+                 (evaluar-expresion body init-env)))))
 
-; Ambiente inicial
-(define init-env
-  (lambda ()
-    (extend-env
-     '(@a @b @c @d @e)
-     '(1 2 3 "hola" "FLP")
-     (empty-env))))
 
 ;Definición tipos de datos referencia y blanco
 
 (define-datatype target target?
   (direct-target (expval expval?))
+  (const-target (expval expval?))
   (indirect-target (ref ref-to-direct-target?)))
 
 (define-datatype reference reference?
@@ -214,7 +209,7 @@
       (id-exp (id) (apply-env env id))
       (var-exp (vars rands body)
                (let ((args (eval-rands rands env)))
-                 (evaluar-expresion body (extend-env vars args env))))
+                 (evaluar-expresion body (extended-env-record vars (list->vector args) env))))  
       (primapp-un-exp (prim rand)
                    (apply-primitive-un prim (evaluar-expresion rand env)))
       (primapp-bin-exp (rand1 prim rand2)
@@ -228,7 +223,7 @@
 (define apply-primitive-bin
   (lambda (prim args1 args2)
     (cases primitiva-binaria prim
-      (primitiva-suma () (+ args1 args2))
+      (primitiva-suma () (+ args1 args2))     
       (primitiva-resta () (- args1 args2))
       (primitiva-multi () (* args1 args2))
       (primitiva-div () (/ args1 args2))
@@ -243,7 +238,7 @@
     (cases primitiva-unaria prim
       (primitiva-add1 () (+ args 1))
       (primitiva-sub1 () (- args 1))
-      (primitiva-longitud () (length args)))))
+      (primitiva-longitud () (string-length args)))))
 
 ;apply-pred-prim: <primitiva>
 (define apply-pred-prim
@@ -256,6 +251,38 @@
       (igual-exp () (eqv? args1 args2))
       (diferente-exp () (not (eqv? args1 args2))))))
 
+;; función para probar booleanos
+(define valor-verdad?
+  (lambda(x)
+    (not (zero? x))))
+    
+;;;;funciones auxiliares para la expresion declare
+
+;;eval-rands evalua los operandos y los convierte en un ambiente
+(define eval-rands
+  (lambda (rands env)
+    (map (lambda (x) (eval-rand x env)) rands)))
+
+(define eval-rand
+  (lambda (rand env)
+    (cases expresion rand
+      (referencia-exp (id)
+               (indirect-target
+                (let ((ref (apply-env-ref env id)))
+                  (cases target (primitive-deref ref)
+                    (direct-target (expval) ref)
+                    (const-target (expval) ref)
+                    (indirect-target (ref1) ref1)))))
+      (else
+       (direct-target (evaluar-expresion rand env))))))
+
+;Booleanos
+(define eval-expr-bool
+  (lambda (exp env)
+    (cases expr-bool exp
+      (pred-prim-exp (prim args1 args2)(apply-pred-prim prim (evaluar-expresion args1 env) (evaluar-expresion args2 env)))
+      (bool-lit-true () 'true)  
+      (bool-lit-false () 'false))))
 
 ;****************************************Blancos y Referencias **********************************************************************
 
@@ -270,15 +297,18 @@
            (a-ref (pos vec)
                   (cases target (vector-ref vec pos)
                     (direct-target (v) #t)
+                    (const-target (v) #t)
                     (indirect-target (v) #f)))))))
 ;
 (define deref
   (lambda (ref)
     (cases target (primitive-deref ref)
       (direct-target (expval) expval)
+      (const-target (expval) expval)
       (indirect-target (ref1)
                        (cases target (primitive-deref ref1)
                          (direct-target (expval) expval)
+                         (const-target (expval) expval)
                          (indirect-target (p)
                                           (eopl:error 'deref
                                                       "Illegal reference: ~s" ref1)))))))
@@ -294,6 +324,7 @@
     (let
         ((ref (cases target (primitive-deref ref)
                 (direct-target (expval1) ref)
+                (const-target (expval1) (eopl:error "No se puede cambiar el valor de una variable CONST"))
                 (indirect-target (ref1) ref1))))
       (primitive-setref! ref (direct-target expval)))))
 
@@ -329,12 +360,6 @@
   (lambda (env sym)
       (deref (apply-env-ref env sym))))
 
-;extend-env: <list-of symbols> <list-of numbers> enviroment -> enviroment
-;función que crea un ambiente extendido
-(define extend-env
-  (lambda (syms vals env)
-    (extended-env-record syms (list->vector vals) env)))
-
 (define apply-env-ref
   (lambda (env sym)
     (cases environment env
@@ -346,30 +371,15 @@
                                  (a-ref pos vals)
                                  (apply-env-ref env sym)))))))
                                  
-;; función para probar booleanos
-(define valor-verdad?
-  (lambda(x)
-    (not (zero? x))))
-    
-;;;;funciones auxiliares para la expresion declare
-
-;;eval-rands evalua los operandos y los convierte en un ambiente
-(define eval-rands
-  (lambda (rands env)
-    (map (lambda (x) (eval-rand x env)) rands)))
-
-(define eval-rand
-  (lambda (rand env)
-    (evaluar-expresion rand env)))
-
-;Booleanos
-(define eval-expr-bool
-  (lambda (exp env)
-    (cases expr-bool exp
-      (pred-prim-exp (prim args1 args2)(apply-pred-prim prim (evaluar-expresion args1 env) (evaluar-expresion args2 env)))
-      (bool-lit-true () 'true)  
-      (bool-lit-false () 'false))))
-
+; Ambiente inicial
+(define init-env  
+  (extended-env-record (list '@x '@y '@z '@a)
+              (list->vector
+                (list (direct-target 4)
+                      (direct-target 2)
+                      (direct-target 5)
+                      (indirect-target (a-ref 0 (list->vector (list (direct-target 4)))))))
+              (empty-env)))
 ;****************************************************************************************
 ;Funciones Auxiliares
 
@@ -401,7 +411,7 @@
 (define-datatype procVal procVal?
   (cerradura
    (lista-ID(list-of symbol?))
-   (exp expresion?)
+   (body expresion?)
    (amb environment?)))
 
 
@@ -410,7 +420,7 @@
   (lambda (proc args)
     (cases procVal proc
       (cerradura (ids body env)
-               (evaluar-expresion body (extend-env ids args env))))))
+               (evaluar-expresion body (extended-env-record ids (list->vector args) env))))))
 
 (interpretador)
     
