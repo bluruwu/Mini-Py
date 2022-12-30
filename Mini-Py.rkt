@@ -47,7 +47,7 @@
     ;Constructores de datos predefinidos
     (expresion ("["(separated-list expresion ",")"]" ) list-exp)
     (expresion ("tupla" "[" (separated-list expresion ";") "]" ) tupla-exp)
-    (expresion ("{" identificador "=" expresion (arbno ";" identificador "=" expresion)"}" ) registro-exp)
+    (expresion ("{" identificador "=" expresion (arbno "," identificador "=" expresion)"}" ) registro-exp)
     (expr-bool (pred-prim "(" expresion "," expresion ")") pred-prim-exp) ;DrRacket
     (expr-bool ("true") bool-lit-true)
     (expr-bool ("false") bool-lit-false)
@@ -94,8 +94,8 @@
     ;Primitivas sobre registros
     (expresion ("registro?" "(" expresion ")") registro?-exp)
     (expresion ("crear-registro" "(" identificador "=" expresion (arbno "," identificador "=" expresion) ")" ) crear-registro-exp)
-    (expresion ("ref-register" "(" expresion "," expresion")") ref-registro-exp)
-    (expresion ("set-register" "(" expresion "," expresion "," expresion")") set-registro-exp)
+    (expresion ("ref-registro" "(" expresion "," expresion")") ref-registro-exp)
+    (expresion ("set-registro" "(" expresion "," expresion "," expresion")") set-registro-exp)
 
     ;Invocación de procedimientos
     ;CAMBIAR FORMA DE PROCEDIMIENTO Y EVALUAR, PONERLO PARECIDO A ALGUN LENGUAJE CONOCIDO, EJ: C++
@@ -227,7 +227,7 @@
                  (append (evaluar-expresion list1 env) (evaluar-expresion list2 env)))
       (ref-list-exp (l p) (list-ref (evaluar-expresion l env) (evaluar-expresion p env)))
       (set-list-exp (l p exp)
-                    (let*
+                    (let
                         (
                          (le (evaluar-expresion l env))
                          (pe (evaluar-expresion p env))
@@ -235,6 +235,38 @@
                          )
                       (append (append (head-to-position '() le pe 0) expe) (list-tail le (+ pe 1)))
                       ))
+      (registro-exp (id exp ids exps)
+                (list (cons id ids) (evaluar-lista (cons exp exps) env))
+                )
+      (registro?-exp (reg) ((list-of list?) (evaluar-expresion reg env)))
+      (crear-registro-exp (id exp ids exps) (list (cons id ids) (evaluar-lista (cons exp exps) env)))
+      (ref-registro-exp (lis reg)
+                        (cases expresion reg
+                          (id-exp (x)
+                                  (let (
+                                        (list (evaluar-expresion lis env))
+                                        )
+                                   (list-ref (car(cdr list)) (pos-registro (car list) x 0))                                    
+                                   )
+                                  )
+                          (else (eopl:error 'invalid-register "No es un indice de registro valido"))
+                         )
+               )
+      (set-registro-exp (lis reg exp)
+                        (cases expresion reg
+                          (id-exp (x)
+                                  (let* (
+                                        (le (evaluar-expresion lis env))
+                                        (expe (cons(evaluar-expresion exp env) '()))
+                                        (pe (pos-registro (car le) x 0))
+                                        (listval (car(cdr le)))
+                                        )
+                                     (cons (car le) (cons (append (append (head-to-position '() listval pe 0) expe) (list-tail listval (+ pe 1)))'()))
+                                   )
+                                  )
+                          (else (eopl:error 'invalid-register "No es un indice de registro valido"))
+                         )
+               )
       (else (eopl:error 'invalid-register "No es un indice de registro valido"))
       )))
 
@@ -309,6 +341,19 @@
         (reverse list2)
         (head-to-position (cons (car list) list2) (cdr list) position (+ counter 1))))
   )
+
+;funcion auxiliar para registros
+(define pos-registro
+  (lambda (lis reg counter)
+    (if (= counter (+ (length lis) 1))
+        (eopl:error 'out-of-register "No existe el registro ~s" reg)
+        (if (eqv? reg (car lis))
+            counter
+            (pos-registro (cdr lis) reg (+ counter 1))
+         )
+     )
+   )
+ )
 
 ;Booleanos
 (define eval-expr-bool
