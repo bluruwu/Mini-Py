@@ -15,8 +15,7 @@
   (white-sp (whitespace) skip)
   (comentario ("//" (arbno (not #\newline))) skip)
   (identificador ("@" letter (arbno (or letter digit))) symbol)
-  (cadena (letter (arbno (or letter digit #\- #\:))) string)
-  (cadena ( "-" letter (arbno (or letter digit #\- #\:))) string)
+  (cadena (#\" any (arbno (not #\")) #\") string)
   (numero (digit (arbno digit)) number)
   (numero ("-" digit (arbno digit)) number)
   (numero (digit (arbno digit) "." digit (arbno digit)) number)
@@ -30,7 +29,7 @@
   '(
     ;Expresiones basicas
     (programa (expresion) un-programa)
-    
+
     ;Identificadores
     (expresion (identificador) id-exp)
     
@@ -41,7 +40,7 @@
     
     ;Datos
     (expresion (numero) numero-lit)
-    (expresion ("\""cadena "\"") cadena-exp)
+    (expresion (cadena) cadena-exp)
     (expresion (expr-bool) exp-bool)
 
     ;Constructores de datos predefinidos
@@ -88,8 +87,6 @@
     (expresion ("crear-tupla" "(" expresion (arbno "," expresion) ")" ) crear-tupla-exp)
     (expresion ("tupla?" "(" expresion ")") tupla?-exp)
     (expresion ("ref-tupla" "(" expresion "," expresion ")" ) ref-tupla-exp)
-    ;ES POSIBLE QUE TOQUE CREAR VACIO, CABEZA Y COLA PROPIOS PARA TUPLAS. DEJAR ESTE MEN POR SI ALGO
-    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     ;Primitivas sobre registros
     (expresion ("registro?" "(" expresion ")") registro?-exp)
@@ -103,10 +100,7 @@
     (expresion ("procedimiento" "("(separated-list identificador",")")" "haga" expresion "finProc") procedimiento-exp)
     (expresion ("evaluar" expresion "("(separated-list expresion ",")")" "finEval") app-exp)
     (expresion ("&" identificador) referencia-exp)
-   
-    ;no se si sea necesario hacer un recproc, por favor VERIFICAR.
-    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
+     
     ;Variables actualizables
     (expresion ("set" identificador "=" expresion) set-exp)
 
@@ -196,19 +190,21 @@
 
 ;**********************************Apply y Evaluar-expresion****************************************************
 
-;FALTA TODO EL EVAL EXPRESION!!!!!!!!!!!!!!!!!!!!!!!!!!!
-;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ;eval-expression: <expression> <enviroment> -> numero | string
 ; evalua la expresión en el ambiente de entrada
 (define evaluar-expresion
   (lambda (exp env)
     (cases expresion exp
       (numero-lit (datum) datum)
-      (cadena-exp (cad) cad)
-      (id-exp (id) (apply-env env id))
+      (cadena-exp (cad) (substring cad 1 (- (string-length cad) 1)))
+      (id-exp (id) (apply-env env id))    
       (var-exp (vars rands body)
                (let ((args (eval-rands rands env)))
-                 (evaluar-expresion body (extended-env-record vars (list->vector args) env))))  
+                 (evaluar-expresion body (extended-env-record vars (list->vector args) env))))
+      (const-exp (ids rands body)
+                (let ((args (map (lambda (x) (const-target (evaluar-expresion x env))) rands)))
+                   (evaluar-expresion body (extended-env-record ids (list->vector args) env))))
+      (referencia-exp (id) (apply-env-ref env id))
       (primapp-un-exp (prim rand)
                    (apply-primitive-un prim (evaluar-expresion rand env)))
       (primapp-bin-exp (rand1 prim rand2)
@@ -321,8 +317,8 @@
                (indirect-target
                 (let ((ref (apply-env-ref env id)))
                   (cases target (primitive-deref ref)
-                    (direct-target (expval) ref)
                     (const-target (expval) ref)
+                    (direct-target (expval) ref)
                     (indirect-target (ref1) ref1)))))
       (else
        (direct-target (evaluar-expresion rand env))))))
@@ -367,7 +363,7 @@
 
 (define expval?
   (lambda (x)
-    (or (number? x) (procVal? x))))
+    (or (number? x) (procVal? x) (string? x) (list? x) (vector? x))))
 ;
 (define ref-to-direct-target?
   (lambda (x)
@@ -382,22 +378,21 @@
 (define deref
   (lambda (ref)
     (cases target (primitive-deref ref)
-      (direct-target (expval) expval)
       (const-target (expval) expval)
+      (direct-target (expval) expval)
       (indirect-target (ref1)
                        (cases target (primitive-deref ref1)
-                         (direct-target (expval) expval)
                          (const-target (expval) expval)
+                         (direct-target (expval) expval)
                          (indirect-target (p)
                                           (eopl:error 'deref
                                                       "Illegal reference: ~s" ref1)))))))
-
 (define primitive-deref
   (lambda (ref)
     (cases reference ref
       (a-ref (pos vec)
              (vector-ref vec pos)))))
-;
+
 (define setref!
   (lambda (ref expval)
     (let
@@ -449,7 +444,7 @@
                              (if (number? pos)
                                  (a-ref pos vals)
                                  (apply-env-ref env sym)))))))
-                                 
+
 ; Ambiente inicial
 (define init-env  
   (extended-env-record (list '@x '@y '@z '@a)
@@ -501,5 +496,5 @@
       (cerradura (ids body env)
                (evaluar-expresion body (extended-env-record ids (list->vector args) env))))))
 
-;(interpretador)
+(interpretador)
     
