@@ -48,10 +48,11 @@
     (expresion ("tupla" "[" (separated-list expresion ";") "]" ) tupla-exp)
     (expresion ("{" identificador "=" expresion (arbno "," identificador "=" expresion)"}" ) registro-exp)
     (expr-bool (pred-prim "(" expresion "," expresion ")") pred-prim-exp) ;DrRacket
-    (expr-bool ("true") bool-lit-true)
-    (expr-bool ("false") bool-lit-false)
-    ;faltan mas boleanos
-
+    (expr-bool (oper-bin-bool "(" expr-bool "," expr-bool ")") oper-bin-exp) ;DrRacket
+    (expr-bool (oper-un-bool "("expr-bool")") oper-un-exp)
+    (expr-bool (bool) bool-exp)
+    (bool ("true") bool-true)
+    (bool ("false") bool-false)
 
     ;Estructuras de control
     (expresion ("begin" expresion (arbno ";" expresion) "end") begin-exp)
@@ -113,11 +114,11 @@
     (pred-prim ("!=") diferente-exp) ;c++
     
     ;<oper−bin−bool>
-    (oper−bin−boo ("and") primitiva-and)
-    (oper−bin−boo ("or") primitiva-or)
+    (oper-bin-bool ("and") primitiva-and)
+    (oper-bin-bool ("or") primitiva-or)
     
     ;<oper−un−bool>
-    (oper−un−bool ("not") primitiva-not)
+    (oper-un-bool ("not") primitiva-not)
     
     ;enteros
     (primitiva-binaria ("+") primitiva-suma)
@@ -195,8 +196,8 @@
 (define evaluar-expresion
   (lambda (exp env)
     (cases expresion exp
-      (numero-lit (datum) datum)
-      (cadena-exp (cad) (substring cad 1 (- (string-length cad) 1)))
+      (numero-lit (numero) numero)
+      (cadena-exp (cadena) (substring cadena 1 (- (string-length cadena) 1)))
       (id-exp (id) (apply-env env id))    
       (var-exp (vars rands body)
                (let ((args (eval-rands rands env)))
@@ -205,11 +206,17 @@
                 (let ((args (map (lambda (x) (const-target (evaluar-expresion x env))) rands)))
                    (evaluar-expresion body (extended-env-record ids (list->vector args) env))))
       (referencia-exp (id) (apply-env-ref env id))
+      (set-exp (id exp)(begin
+                         (setref! (apply-env-ref env id)
+                                  (evaluar-expresion exp env))
+                        "Se ha actualizado la variable"))
       (primapp-un-exp (prim rand)
                    (apply-primitive-un prim (evaluar-expresion rand env)))
       (primapp-bin-exp (rand1 prim rand2)
                    (apply-primitive-bin prim (evaluar-expresion rand1 env) (evaluar-expresion rand2 env))
-                   );exp-bool
+                   )
+      (exp-bool (expr-bool)
+                (eval-expr-bool expr-bool env))
       (list-exp (list) (evaluar-lista list env))
       (crear-lista-exp (ca co)
                 (cons (evaluar-expresion ca env) (evaluar-lista co env))
@@ -298,6 +305,19 @@
       (igual-exp () (eqv? args1 args2))
       (diferente-exp () (not (eqv? args1 args2))))))
 
+;apply-oper-bin-bool: <primitiva>
+(define apply-oper-bin-bool
+  (lambda (prim args1 args2)
+    (cases oper-bin-bool prim
+      (primitiva-and () (and args1 args2))
+      (primitiva-or () (or args1 args2)))))
+
+;apply-oper-un-bool: <primitiva>
+(define apply-oper-un-bool
+  (lambda (prim args1)
+    (cases oper-un-bool prim
+      (primitiva-not () (not args1)))))
+
 ;; función para probar booleanos
 (define valor-verdad?
   (lambda(x)
@@ -355,9 +375,21 @@
 (define eval-expr-bool
   (lambda (exp env)
     (cases expr-bool exp
-      (pred-prim-exp (prim args1 args2)(apply-pred-prim prim (evaluar-expresion args1 env) (evaluar-expresion args2 env)))
-      (bool-lit-true () 'true)  
-      (bool-lit-false () 'false))))
+      (pred-prim-exp (prim args1 args2)
+                     (apply-pred-prim prim
+                                      (evaluar-expresion args1 env)
+                                      (evaluar-expresion args2 env)))
+      (oper-bin-exp  (prim args1 args2)
+                     (apply-oper-bin-bool prim
+                                          (eval-expr-bool args1 env)
+                                          (eval-expr-bool args2 env)))
+      (oper-un-exp (prim args1)
+                   (apply-oper-un-bool prim
+                                       (eval-expr-bool args1 env)))   
+      (bool-exp (arg)
+                (cases bool arg
+                  (bool-true () #t)
+                  (bool-false () #f))))))
 
 ;****************************************Blancos y Referencias **********************************************************************
 
@@ -407,6 +439,7 @@
     (cases reference ref
       (a-ref (pos vec)
              (vector-set! vec pos val)))))
+
 
 ;******************************************** Ambientes *******************************************
 ;****Gramatica*******
