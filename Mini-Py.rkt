@@ -270,6 +270,13 @@
                           (else (eopl:error 'invalid-register "No es un indice de registro valido"))
                          )
                )
+      (crear-tupla-exp (head tail)
+                       (list->vector (map (lambda (arg) (evaluar-expresion arg env)  ) (cons head tail)))
+                       )
+      (tupla?-exp (body) (vector? (evaluar-expresion body env)))
+      (ref-tupla-exp (tupla index)
+                     (vector-ref (evaluar-expresion tupla env) (evaluar-expresion index env)))
+      
       (else (eopl:error 'invalid-register "No es un indice de registro valido"))
       )))
 
