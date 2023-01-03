@@ -55,9 +55,9 @@
     (bool ("false") bool-false)
 
     ;Estructuras de control
-    (expresion ("begin" expresion (arbno ";" expresion) "end") begin-exp)
-    (expresion ("if" expr-bool "then" expresion "else" expresion ) if-exp)
-    (expresion ("while" expr-bool "do" expresion) while-exp)
+    (expresion ("begin" expresion (arbno ";" expresion) "end") begin-exp) 
+    (expresion ("if" expr-bool ":" expresion "else" ":" expresion "end" ) if-exp) ;python
+    (expresion ("while" expr-bool ":" expresion "done") while-exp) ;python
     (expresion ("for" identificador "=" expresion iterador expresion "do" "{" expresion "}" "done") for-exp)
     (iterador ("to") iter-to)
     (iterador ("downto") iter-down)
@@ -189,15 +189,18 @@
   (a-ref (position integer?)
          (vec vector?)))
 
-;**********************************Apply y Evaluar-expresion****************************************************
+;**********************************Applies y Evaluar-expresion****************************************************
 
 ;eval-expression: <expression> <enviroment> -> numero | string
 ; evalua la expresión en el ambiente de entrada
 (define evaluar-expresion
   (lambda (exp env)
     (cases expresion exp
+      ;Numero
       (numero-lit (numero) numero)
+      ;Texto
       (cadena-exp (cadena) (substring cadena 1 (- (string-length cadena) 1)))
+      ;Identificadores
       (id-exp (id) (apply-env env id))    
       (var-exp (vars rands body)
                (let ((args (eval-rands rands env)))
@@ -205,18 +208,39 @@
       (const-exp (ids rands body)
                 (let ((args (map (lambda (x) (const-target (evaluar-expresion x env))) rands)))
                    (evaluar-expresion body (extended-env-record ids (list->vector args) env))))
+      ;Referencia
       (referencia-exp (id) (apply-env-ref env id))
+      ;Set
       (set-exp (id exp)(begin
                          (setref! (apply-env-ref env id)
                                   (evaluar-expresion exp env))
                         "Se ha actualizado la variable"))
+      ;Primitivas unarias
       (primapp-un-exp (prim rand)
                    (apply-primitive-un prim (evaluar-expresion rand env)))
+      ;Primitivas binarias
       (primapp-bin-exp (rand1 prim rand2)
-                   (apply-primitive-bin prim (evaluar-expresion rand1 env) (evaluar-expresion rand2 env))
-                   )
+                   (apply-primitive-bin prim (evaluar-expresion rand1 env) (evaluar-expresion rand2 env)))
+      ;Primitivas booleanas
       (exp-bool (expr-bool)
                 (eval-expr-bool expr-bool env))
+      ;Begin
+      (begin-exp (exp exps)
+                 (let loop ((acc (evaluar-expresion exp env))
+                            (exps exps))
+                   (if (null? exps)
+                       acc
+                       (loop (evaluar-expresion (car exps) env)
+                             (cdr exps)))))
+      ;If
+      (if-exp (expr-bool true-exp false-exp)
+              (if (eval-expr-bool expr-bool env)
+                  (evaluar-expresion true-exp env)
+                  (evaluar-expresion false-exp env)))
+      ;While
+      (while-exp (expr-bool body)
+                 (while expr-bool body env))
+      ;Listas
       (list-exp (list) (evaluar-lista list env))
       (crear-lista-exp (ca co)
                 (cons (evaluar-expresion ca env) (evaluar-lista co env))
@@ -238,6 +262,7 @@
                          )
                       (append (append (head-to-position '() le pe 0) expe) (list-tail le (+ pe 1)))
                       ))
+      ;Registros
       (registro-exp (id exp ids exps)
                 (list (cons id ids) (evaluar-lista (cons exp exps) env))
                 )
@@ -270,12 +295,15 @@
                           (else (eopl:error 'invalid-register "No es un indice de registro valido"))
                          )
                )
+      ;Tuplas
       (crear-tupla-exp (head tail)
                        (list->vector (map (lambda (arg) (evaluar-expresion arg env)  ) (cons head tail)))
                        )
       (tupla?-exp (body) (vector? (evaluar-expresion body env)))
       (ref-tupla-exp (tupla index)
                      (vector-ref (evaluar-expresion tupla env) (evaluar-expresion index env)))
+      ;Imprimir
+      (print-exp (txt) (display (evaluar-expresion txt env)) (newline))
       
       (else (eopl:error 'invalid-register "No es un indice de registro valido"))
       )))
@@ -330,7 +358,13 @@
   (lambda(x)
     (not (zero? x))))
     
-;;;;funciones auxiliares para la expresion declare
+;WHILE
+(define while
+      (lambda (expr-bool body env)
+        (if (eval-expr-bool expr-bool env)
+            (begin (evaluar-expresion body env)
+                   (while expr-bool body env))
+             1)))
 
 ;;eval-rands evalua los operandos y los convierte en un ambiente
 (define eval-rands
