@@ -58,7 +58,7 @@
     (expresion ("begin" expresion (arbno ";" expresion) "end") begin-exp) 
     (expresion ("if" expr-bool ":" expresion "else" ":" expresion "end" ) if-exp) ;python
     (expresion ("while" expr-bool ":" expresion "done") while-exp) ;python
-    (expresion ("for" identificador "=" expresion iterador expresion "do" "{" expresion "}" "done") for-exp)
+    (expresion ("for" "(" identificador "=" expresion iterador expresion ")" "{" expresion "}") for-exp)
     (iterador ("to") iter-to)
     (iterador ("downto") iter-down)
     
@@ -240,6 +240,10 @@
       ;While
       (while-exp (expr-bool body)
                  (while expr-bool body env))
+      ;for
+      (for-exp (var value way x body ) (forfunction-verify var (evaluar-expresion value env) way (evaluar-expresion x env) body env)  )
+
+      
       ;Listas
       (list-exp (list) (evaluar-lista list env))
       (crear-lista-exp (ca co)
@@ -365,6 +369,44 @@
             (begin (evaluar-expresion body env)
                    (while expr-bool body env))
              1)))
+;for
+(define forfunction-verify
+  (lambda (var val way x body env)
+    (cases iterador way 
+      (iter-to () (forfunction-up var val x body env) )
+      (iter-down () (forfunction-down var val x body env) )
+        )
+
+    )
+
+  )
+(define forfunction-up
+  (lambda (var val x body env)
+    
+    (if
+     (< val x)
+     (begin
+       (evaluar-expresion body env)
+       (forfunction-up var (+ 1 val) x body env )
+
+       )
+     1)
+  )
+  )
+(define forfunction-down
+  (lambda (var val x body env)
+    
+    (if
+     (> val x)
+     (begin
+       (evaluar-expresion body env)
+       (forfunction-down var (- val 1) x body env )
+
+       )
+     1)
+  )
+  )
+
 
 ;;eval-rands evalua los operandos y los convierte en un ambiente
 (define eval-rands
