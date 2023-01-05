@@ -97,7 +97,7 @@
 
     ;Invocación de procedimientos
     (expresion ("function" "("(separated-list identificador",")")" "{" expresion "}") procedimiento-exp) ;javascript
-    (expresion ("evaluar" expresion "("  (arbno expresion) ")") app-exp) ;java
+    (expresion ("evaluar" expresion "("  (arbno expresion) ")") evaluar-exp) ;java
     (expresion ("&" identificador) referencia-exp)
      
     ;Variables actualizables
@@ -309,7 +309,7 @@
       ;procedimientos
       (procedimiento-exp (ids body)
                 (cerradura ids body env))
-      (app-exp (rator rands)
+      (evaluar-exp (rator rands)
                (let ((proc (evaluar-expresion rator env))
                      (args (eval-rands rands env)))
                  (if (procVal? proc)
