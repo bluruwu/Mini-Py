@@ -96,10 +96,8 @@
     (expresion ("set-registro" "(" expresion "," expresion "," expresion")") set-registro-exp)
 
     ;Invocación de procedimientos
-    ;CAMBIAR FORMA DE PROCEDIMIENTO Y EVALUAR, PONERLO PARECIDO A ALGUN LENGUAJE CONOCIDO, EJ: C++
-    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    (expresion ("procedimiento" "("(separated-list identificador",")")" "haga" expresion "finProc") procedimiento-exp)
-    (expresion ("evaluar" expresion "("(separated-list expresion ",")")" "finEval") app-exp)
+    (expresion ("function" "("(separated-list identificador",")")" "{" expresion "}") procedimiento-exp) ;javascript
+    (expresion ("evaluar" expresion "("  (arbno expresion) ")") app-exp) ;java
     (expresion ("&" identificador) referencia-exp)
      
     ;Variables actualizables
@@ -308,7 +306,16 @@
                      (vector-ref (evaluar-expresion tupla env) (evaluar-expresion index env)))
       ;Imprimir
       (print-exp (txt) (display (evaluar-expresion txt env)) (newline))
-      
+      ;procedimientos
+      (procedimiento-exp (ids body)
+                (cerradura ids body env))
+      (app-exp (rator rands)
+               (let ((proc (evaluar-expresion rator env))
+                     (args (eval-rands rands env)))
+                 (if (procVal? proc)
+                     (apply-procedure proc args)
+                     (eopl:error 'evaluar-expresion
+                                 "Attempt to apply non-procedure ~s" proc))))
       (else (eopl:error 'invalid-register "No es un indice de registro valido"))
       )))
 
@@ -322,7 +329,6 @@
       (primitiva-div () (/ args1 args2))
       (primitiva-mod () (modulo args1 args2))
       (primitiva-concat () (string-append args1 args2)))))
-       ;aqui iria append
     
 
 ;apply-primitive-un: <primitiva> <expresion> -> numero
@@ -426,6 +432,8 @@
       (else
        (direct-target (evaluar-expresion rand env))))))
 
+; (apply-env-ref env id)
+
 ;;funcion auxiliar para listas
 (define evaluar-lista
   (lambda (list env)
@@ -453,6 +461,7 @@
      )
    )
  )
+
 
 ;Booleanos
 (define eval-expr-bool
@@ -613,4 +622,59 @@
                (evaluar-expresion body (extended-env-record ids (list->vector args) env))))))
 
 (interpretador)
-    
+;******************************************* Pruebas ****************************************************
+
+;Enteros
+(scan&parse "7")
+
+;Flotantes
+(scan&parse "4.4")
+
+;Cadena
+(scan&parse "\"hola\"")
+
+;Boleanos
+(scan&parse "true")
+(scan&parse "false")
+
+;Identificador
+(scan&parse "@p")
+(scan&parse "@q")
+
+;Referencia
+(scan&parse "&@p")
+
+;Variable
+(scan&parse "var @x = 6 in add1(@x)")
+
+;Actualización de variable
+(scan&parse "var @l = 7 in begin set @l = 10; @l end")
+
+;procedimientos
+(scan&parse "function(@a, @b, @c) {((@a + @b)*@c)}")
+
+;invocación de procedimientos
+
+;por valor
+(scan&parse "const @p = function(@r) {add1(@r)} in var @f = 2 in evaluar @p(@f)")
+(scan&parse "const @p = function(@r) {set-list(@r,0,15)} in var @f = [1,2,3] in evaluar @p(@f)")
+
+(scan&parse "const @p = function(@r) {set @r = 6} in var @f = 2 in begin evaluar @p(@f); @f end")
+
+;por referencia
+(scan&parse "const @p = function(@r) {set @r = 6} in var @f = 2 in begin evaluar @p(&@f); @f end")
+
+;listas
+(scan&parse "crear-lista(5,4,3)") ;crear lista
+(scan&parse "var @y = crear-lista(1,2,3) in set-list(@y,1,8)") ;set list
+(scan&parse "lista? (crear-lista(5,4,3))") ;lista? 
+(scan&parse "cabeza (crear-lista(5,4,3))") ;cabeza
+(scan&parse "cola (crear-lista(5,4,3))") ;cola
+(scan&parse "append ([5,7,9], [9,4,10])") ;append
+(scan&parse "ref-list([0,7,15],2)") ;ref
+
+;registros
+(scan&parse "crear-registro(@a = 5, @b = 6)") ;crear registro
+(scan&parse "registro?(crear-registro(@g=8,@h=6))") ;registro?
+(scan&parse "ref-registro({@f = 7, @g = 5}, @g)") ;ref registro
+(scan&parse "set-registro({@f = 7, @g = 5},@f, 1)") ;set registro
