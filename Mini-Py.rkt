@@ -42,6 +42,10 @@
     (expresion (numero) numero-lit)
     (expresion (cadena) cadena-exp)
     (expresion (expr-bool) exp-bool)
+    (expresion ("x8" "(" (arbno numero)")") oct-exp)
+    (expresion ("x16" "("(arbno numero) ")" ) hex-exp)
+    (expresion ("x32" "(" (arbno numero)")" ) bignum-exp)
+    
 
     ;Constructores de datos predefinidos
     (expresion ("["(separated-list expresion ",")"]" ) list-exp)
@@ -66,8 +70,7 @@
     (expresion ("("expresion primitiva-binaria expresion")") primapp-bin-exp)
     (expresion (primitiva-unaria "("expresion")") primapp-un-exp)
     
-    ;Primitivas aritmeticas para hexodecimales [FALTA]
-    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
 
     ;Primitivas sobre cadenas
     (primitiva-unaria ("longitud") primitiva-longitud)
@@ -126,9 +129,27 @@
     (primitiva-binaria ("%") primitiva-mod) 
     (primitiva-unaria ("add1") primitiva-add1)
     (primitiva-unaria ("sub1") primitiva-sub1)
+    ;octales
+    (primitiva-binaria ("+(x8)") oct-suma)
+    (primitiva-binaria ("~(x8)") oct-resta)
+    (primitiva-binaria ("*(x8)") oct-multi)
+    (primitiva-unaria ("add1(x8)") oct-add1)
+    (primitiva-unaria ("sub1(x8)") oct-sub1)
+    ;hexadecimales
+    (primitiva-binaria ("+(x16)") hex-suma)
+    (primitiva-binaria ("~(x16)") hex-resta)
+    (primitiva-binaria ("*(x16)") hex-multi)
+    (primitiva-unaria ("add1(x16)") hex-add1)
+    (primitiva-unaria ("sub1(x16)") hex-sub1)
+    ;base 32
+    (primitiva-binaria ("+(x32)") big-suma)
+    (primitiva-binaria ("~(x32)") big-resta)
+    (primitiva-binaria ("*(x32)") big-multi)
+    (primitiva-unaria ("add1(x32)") big-add1)
+    (primitiva-unaria ("sub1(x32)") big-sub1)
     
-    ;FALTA HEXADECIMALES
-    ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    
     
     ;Imprimir
     (expresion ("print" "(" expresion ")") print-exp)
@@ -196,6 +217,11 @@
     (cases expresion exp
       ;Numero
       (numero-lit (numero) numero)
+      ;numero octal,hexadecimal y 32
+      (oct-exp (numero) numero)
+      (hex-exp (numero) numero)
+      (bignum-exp (numero) numero)
+      
       ;Texto
       (cadena-exp (cadena) (substring cadena 1 (- (string-length cadena) 1)))
       ;Identificadores
@@ -323,12 +349,39 @@
 (define apply-primitive-bin
   (lambda (prim args1 args2)
     (cases primitiva-binaria prim
+      ;decimales
       (primitiva-suma () (+ args1 args2))     
       (primitiva-resta () (- args1 args2))
       (primitiva-multi () (* args1 args2))
       (primitiva-div () (/ args1 args2))
       (primitiva-mod () (modulo args1 args2))
-      (primitiva-concat () (string-append args1 args2)))))
+      (primitiva-concat () (string-append args1 args2))
+      ;octales
+      (oct-suma () (suma-base args1 args2 8) )
+      (oct-resta () (resta-base args1 args2 8) )
+      (oct-multi () (multi-base args1 args2 8) )
+     
+      
+      ;hexadecimales
+      (hex-suma () (suma-base args1 args2 16) )
+      (hex-resta () (resta-base args1 args2 16) )
+      (hex-multi () (multi-base args1 args2 16) )
+      
+      
+      ;base 32
+      (big-suma () (suma-base args1 args2 32) )
+      (big-resta () (resta-base args1 args2 32) )
+      (big-multi () (multi-base args1 args2 32) )
+      
+      
+      
+      
+
+      )
+
+
+
+    ))
     
 
 ;apply-primitive-un: <primitiva> <expresion> -> numero
@@ -337,7 +390,16 @@
     (cases primitiva-unaria prim
       (primitiva-add1 () (+ args 1))
       (primitiva-sub1 () (- args 1))
-      (primitiva-longitud () (string-length args)))))
+      (primitiva-longitud () (string-length args))
+      (oct-add1 () (sucesor-base args 8) )
+      (oct-sub1 () (predecesor-base args 8) )
+      (hex-add1 () (sucesor-base args 16) )
+      (hex-sub1 () (predecesor-base args 16) )
+      (big-add1 () (sucesor-base args 32) )
+      (big-sub1 () (predecesor-base args 32) )
+      
+
+      )))
 
 ;apply-pred-prim: <primitiva>
 (define apply-pred-prim
@@ -605,6 +667,86 @@
               (if (number? list-index-r)
                 (+ list-index-r 1)
                 #f))))))
+
+
+;***********************************************numeros no decimales*************************
+;operaciones aritmeticas para numeros no decimales
+(define sucesor-base
+  (lambda (num base)
+     (let ((x (reverse num))) (reverse (suma1-base x base))   )
+   ))
+
+(define suma1-base
+  (lambda (num base)
+    (if(null? num)
+      '(1)
+      (if (< (car num) (- base 1 ))
+           (cons (+ 1 (car num)) (cdr num)  )
+          (cons 0 (suma1-base(cdr num) base ) )
+          )
+      )
+
+    )
+
+  )
+
+(define predecesor-base
+  (lambda (num base)
+    (let ((x (reverse num))) (reverse (resta1-number x base))   )
+    )
+
+  )
+
+(define resta1-number
+  (lambda (num base)
+    (if(null? num)
+       (eopl:error "limite alcanzado")
+       (if (> (car num) 0)
+           (if (and (eq? (- (car num) 1) 0) (null? (cdr num)))
+               '()
+               (cons (- (car num) 1) (cdr num)))
+           (cons (- base 1) (resta1-number (cdr num) base)))
+           )))
+
+
+(define suma-base
+ (lambda (elem1 elem2 base)
+   (if(null? elem2)
+      elem1
+      (suma-base (sucesor-base elem1 base) (predecesor-base elem2 base) base)
+
+      )
+   )
+ )
+
+
+(define resta-base
+ (lambda (elem1 elem2 base)
+   (if (null? elem2)
+       elem1
+       (predecesor-base (resta-base elem1 (predecesor-base elem2 base) base) base)
+    )
+
+   )
+ )
+
+
+(define multi-base
+ (lambda (elem1 elem2 base)
+   (if (null? elem2 )
+       elem1
+       (suma-base elem1 (multi-base elem1 (predecesor-base elem2 base) base) base)
+       )
+
+   )
+ )
+
+
+
+
+
+
+
 
 ;******************************************** Procedimientos *******************************************
 (define-datatype procVal procVal?
