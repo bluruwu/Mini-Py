@@ -335,6 +335,9 @@
       ;procedimientos
       (procedimiento-exp (ids body)
                 (cerradura ids body env))
+      (letrec-exp (proc-names idss bodies letrec-body)
+                  (evaluar-expresion letrec-body
+                                   (extend-env-recursively proc-names idss bodies env)))
       (evaluar-exp (rator rands)
                (let ((proc (evaluar-expresion rator env))
                      (args (eval-rands rands env)))
@@ -607,9 +610,16 @@
   (extended-env-record
    (syms (list-of symbol?))
    (vec vector?)
-   (env environment?)))
+   (env environment?))
+  (extend-env-recursively
+                        (proc-names (list-of symbol?))
+                        (idss (list-of (list-of symbol?)))
+                        (bodies (list-of expresion?))
+                        (env environment?)))
 
 (define scheme-value? (lambda (v) #t))
+
+
 
 (define empty-env  
   (lambda ()
@@ -630,7 +640,15 @@
                            (let ((pos (rib-find-position sym syms)))
                              (if (number? pos)
                                  (a-ref pos vals)
-                                 (apply-env-ref env sym)))))))
+                                 (apply-env-ref env sym))))
+      (extend-env-recursively (proc-names idss bodies env)
+                              (let ((pos (rib-find-position sym proc-names)))
+                                (if (number? pos)
+                                    (make-ref
+                                     (cerradura (list-ref idss pos)
+                                                (list-ref bodies pos)
+                                                env))
+                                    (apply-env-ref env sym)))))))
 
 ; Ambiente inicial
 (define init-env  
@@ -667,7 +685,9 @@
               (if (number? list-index-r)
                 (+ list-index-r 1)
                 #f))))))
-
+  
+(define make-ref(lambda val
+    (a-ref 0 (vector (direct-target (car val))))))
 
 ;***********************************************numeros no decimales*************************
 ;operaciones aritmeticas para numeros no decimales
