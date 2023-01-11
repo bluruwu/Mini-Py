@@ -691,18 +691,14 @@
 
 ;***********************************************numeros no decimales*************************
 ;operaciones aritmeticas para numeros no decimales
-(define sucesor-base
-  (lambda (num base)
-     (let ((x (reverse num))) (reverse (suma1-base x base))   )
-   ))
 
-(define suma1-base
+(define sucesor-base
   (lambda (num base)
     (if(null? num)
       '(1)
       (if (< (car num) (- base 1 ))
            (cons (+ 1 (car num)) (cdr num)  )
-          (cons 0 (suma1-base(cdr num) base ) )
+          (cons 0 (sucesor-base(cdr num) base ) )
           )
       )
 
@@ -710,14 +706,9 @@
 
   )
 
+
+
 (define predecesor-base
-  (lambda (num base)
-    (let ((x (reverse num))) (reverse (resta1-number x base))   )
-    )
-
-  )
-
-(define resta1-number
   (lambda (num base)
     (if(null? num)
        (eopl:error "limite alcanzado")
@@ -725,7 +716,7 @@
            (if (and (eq? (- (car num) 1) 0) (null? (cdr num)))
                '()
                (cons (- (car num) 1) (cdr num)))
-           (cons (- base 1) (resta1-number (cdr num) base)))
+           (cons (- base 1) (predecesor-base (cdr num) base)))
            )))
 
 
