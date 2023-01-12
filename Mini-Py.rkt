@@ -14,7 +14,7 @@
 '(
   (white-sp (whitespace) skip)
   (comentario ("//" (arbno (not #\newline))) skip)
-  (identificador (letter (arbno (or letter digit "?"))) symbol)
+  (identificador (letter (arbno (or letter digit))) symbol)
   (cadena (#\" any (arbno (not #\")) #\") string)
   (numero (digit (arbno digit)) number)
   (numero ("-" digit (arbno digit)) number)
@@ -191,7 +191,7 @@
 ;Parser, Scanner, Interfaz
 
 ;El FrontEnd (Análisis léxico (scanner) y sintáctico (parser) integrados)
-;;letrec @fact(@n) = Si @n entonces (@n * (@fact sub1(@n))) sino 1 finSi in (@fact 20)
+;;letrec fact(n) = Si n entonces (n * (fact sub1(n))) sino 1 finSi in (fact 20)
 (define scan&parse
   (sllgen:make-string-parser scanner-spec-simple-interpreter grammar-simple-interpreter))
 
@@ -238,6 +238,7 @@
 (define-datatype reference reference?
   (a-ref (position integer?)
          (vec vector?)))
+
 
 ;**********************************Applies y Evaluar-expresion****************************************************
 
@@ -382,7 +383,7 @@
       ;procedimientos
       
       (procedimiento-exp (ids body)
-                (closure ids body env))
+                (cerradura ids body env))
       
       (letrec-exp (proc-names idss bodies letrec-body)
                   (evaluar-expresion letrec-body
@@ -420,13 +421,6 @@
       (else (eopl:error 'invalid-register "No es un indice de registro valido"))
       )))
       
-
-(define eval-rands
-  (lambda (exps env)
-    (map
-      (lambda (exp) (evaluar-expresion exp env))
-      exps)))
-
 ;apply-primitive-bin: <expresion> <primitiva> <expresion> -> numero
 (define apply-primitive-bin
   (lambda (prim args1 args2)
@@ -539,16 +533,9 @@
        (suma-base elem1 (multi-base elem1 (predecesor-base elem2 base) base) base))))
 
 
-;(define init-env 
- ;  (extend-env
-  ;    '(i v x)
-   ;   '(1 5 10)
-    ;  (empty-env))))
-
-;^;;;;;;;;;;;;;;; booleans ;;;;;;;;;;;;;;;;
-
+;; función para probar booleanos
 (define valor-verdad?
-  (lambda (x)
+  (lambda(x)
     (not (zero? x))))
 
 ;WHILE
@@ -557,7 +544,7 @@
         (if (eval-expr-bool expr-bool env)
             (begin (evaluar-expresion body env)
                    (while expr-bool body env))
-             'done)))
+             1)))
 
 ;for
 (define forfunction-verify
@@ -575,7 +562,7 @@
        (evaluar-expresion body env)
        (forfunction-up var (+ 1 val) x body env )
        )
-     'done-for)
+     1)
   ))
 
 (define forfunction-down
@@ -589,6 +576,13 @@
        )
      1)
   ))
+
+;;eval-rands evalua los operandos y los convierte en un ambiente
+(define eval-rands
+  (lambda (exps env)
+    (map
+      (lambda (exp) (evaluar-expresion exp env)) exps)))
+
 
 ;///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -671,65 +665,23 @@
         (vector-set! vec pos val)))
     ))
 
-;;;;;;;;;;;;;;;; declarations ;;;;;;;;;;;;;;;;
 
-(define clase-declarada->class-name
-  (lambda (c-decl)
-    (cases clase-declarada c-decl
-      (a-clase-declarada (class-name super-name field-ids m-decls)
-        class-name))))
 
-(define clase-declarada->super-name
-  (lambda (c-decl)
-    (cases clase-declarada c-decl
-      (a-clase-declarada (class-name super-name field-ids m-decls)
-        super-name))))
 
-(define clase-declarada->field-ids
-  (lambda (c-decl)
-    (cases clase-declarada c-decl
-      (a-clase-declarada (class-name super-name field-ids m-decls)
-        field-ids))))
-
-(define clase-declarada->method-decls
-  (lambda (c-decl)
-    (cases clase-declarada c-decl
-      (a-clase-declarada (class-name super-name field-ids m-decls)
-        m-decls))))
-
-(define method-decl->method-name
-  (lambda (md)
-    (cases method-decl md
-      (a-method-decl (method-name ids body) method-name))))
-
-(define method-decl->ids
-  (lambda (md)
-    (cases method-decl md
-      (a-method-decl (method-name ids body) ids))))
-
-(define method-decl->body
-  (lambda (md)
-    (cases method-decl md
-      (a-method-decl (method-name ids body) body))))
-
-(define method-decls->method-names
-  (lambda (mds)
-    (map method-decl->method-name mds)))
-        
-;^;;;;;;;;;;;;;;; procedures ;;;;;;;;;;;;;;;;
-
+;******************************************** Procedimientos *******************************************
 (define-datatype procval procval?
-  (closure 
-    (ids (list-of symbol?)) 
-    (body expresion?)
-    (env environment?)))
+  (cerradura
+   (lista-ID(list-of symbol?))
+   (body expresion?)
+   (amb environment?)))
 
+;apply-procval: evalua el cuerpo de un procedimientos en el ambiente extendido correspondiente
 (define apply-procval
   (lambda (proc args)
     (cases procval proc
-      (closure (ids body env)
-        (evaluar-expresion body (extend-env ids args env))))))
-               
+      (cerradura (ids body env)
+               (evaluar-expresion body (extended-env-record ids (list->vector args) env))))))
+              
 
 ;^;;;;;;;;;;;;;;; environments ;;;;;;;;;;;;;;;;
 
@@ -737,7 +689,7 @@
   (empty-env-record)
   (extended-env-record
     (syms (list-of symbol?))
-    (vec vector?)              ; can use this for anything.
+    (vec vector?)            
     (env environment?))
   )
 
@@ -771,7 +723,7 @@
         (let ((env (extended-env-record proc-names vec old-env)))
           (for-each
             (lambda (pos ids body)
-              (vector-set! vec pos (closure ids body env)))
+              (vector-set! vec pos (cerradura ids body env)))
             (iota len) idss bodies)
           env)))))
 
@@ -807,13 +759,10 @@
        (difference (cdr set1) set2))
       (else (cons (car set1) (difference (cdr set1) set2))))))
 
-
-;^; new for ch 5
 (define extend-env-refs
   (lambda (syms vec env)
     (extended-env-record syms vec env)))
 
-;^; waiting for 5-4-2.  Brute force code.
 (define list-find-last-position
   (lambda (sym los)
     (let loop
@@ -827,8 +776,7 @@
 
 ;; evaluar
 (define aux
-   (lambda (x)
-     x))
+   (lambda (x) x))
 
 (define-datatype part part? 
   (a-part
@@ -850,7 +798,8 @@
       (clase-declarada->class-name c-decl)
       (make-vector (length (clase-declarada->field-ids c-decl))))))
 
-;;;;;;;;;;;;;;;; methods ;;;;;;;;;;;;;;;;
+
+;************************** methods **************************
 
 ;;; methods are represented by their declarations.  They are closed
 ;;; over their fields at application time, by apply-method.
@@ -895,7 +844,8 @@
         (part->fields    (car parts))
         (build-field-env (cdr parts))))))
 
-;;;;;;;;;;;;;;;; method environments ;;;;;;;;;;;;;;;;
+
+;************************* method environments *************************
 
 ;; find a method in a list of method-decls, else return #f
 
@@ -907,9 +857,8 @@
        (car m-decls))
       (else (lookup-method-decl m-name (cdr m-decls))))))
       
-;;;;;;;;;;;;;;;; class environments ;;;;;;;;;;;;;;;;
 
-;;; we'll just use the list of class-decls.
+;************************** class environments **************************
 
 (define the-class-env '())
 
@@ -926,8 +875,55 @@
            "Unknown class ~s" name))
         ((eqv? (clase-declarada->class-name (car env)) name) (car env))
         (else (loop (cdr env)))))))
+        
 
-;;;;;;;;;;;;;;;; selectors of all sorts ;;;;;;;;;;;;;;;;
+;************************** declarations **************************
+
+(define clase-declarada->class-name
+  (lambda (c-decl)
+    (cases clase-declarada c-decl
+      (a-clase-declarada (class-name super-name field-ids m-decls)
+        class-name))))
+
+(define clase-declarada->super-name
+  (lambda (c-decl)
+    (cases clase-declarada c-decl
+      (a-clase-declarada (class-name super-name field-ids m-decls)
+        super-name))))
+
+(define clase-declarada->field-ids
+  (lambda (c-decl)
+    (cases clase-declarada c-decl
+      (a-clase-declarada (class-name super-name field-ids m-decls)
+        field-ids))))
+
+(define clase-declarada->method-decls
+  (lambda (c-decl)
+    (cases clase-declarada c-decl
+      (a-clase-declarada (class-name super-name field-ids m-decls)
+        m-decls))))
+
+(define method-decl->method-name
+  (lambda (md)
+    (cases method-decl md
+      (a-method-decl (method-name ids body) method-name))))
+
+(define method-decl->ids
+  (lambda (md)
+    (cases method-decl md
+      (a-method-decl (method-name ids body) ids))))
+
+(define method-decl->body
+  (lambda (md)
+    (cases method-decl md
+      (a-method-decl (method-name ids body) body))))
+
+(define method-decls->method-names
+  (lambda (mds)
+    (map method-decl->method-name mds)))      
+      
+
+;************************** selectors of all sorts **************************
 
 (define part->class-name
   (lambda (prt)
@@ -969,14 +965,13 @@
   (lambda (parts)
     (part->class-name (car parts))))
 
-;;
 
 (interpretador)
+
 
 ;******************************************* Pruebas ****************************************************
 ;Enteros
 (scan&parse "7")
-
 
 ;Flotantes
 (scan&parse "4.4")
@@ -1029,6 +1024,7 @@
 (scan&parse "cola (crear-lista(5,4,3))") ;cola
 (scan&parse "append ([5,7,9], [9,4,10])") ;append
 (scan&parse "ref-list([0,7,15],2)") ;ref
+
 ;tupla
 (scan&parse "crear-tupla(2,3,4,5,6)")
 (scan&parse "tupla?(crear-tupla(2,3,4,5,6))")
@@ -1038,13 +1034,11 @@
 (scan&parse "cola-tupla(crear-tupla(2,3,4,5))")
 (scan&parse "cola-tupla(tupla[2,3,4,5])")
 
-
 ;registros
 (scan&parse "crear-registro(a = 5, b = 6)") ;crear registro
 (scan&parse "registro?(crear-registro(g=8,h=6))") ;registro?
 (scan&parse "ref-registro({f = 7, g = 5}, g)") ;ref registro
 (scan&parse "set-registro({f = 7, g = 5},f, 1)") ;set registro
-
 
 ;;;;estructuras de control
 (scan&parse "if <(3,5) : (6+7) else : (7~6) end")
@@ -1065,16 +1059,20 @@
 (scan&parse "(x8(7) ~(x8) x8(4))")
 (scan&parse "(x16(15) ~(x16) x16(15))")
 (scan&parse "(x32(31) ~(x32) x32(3))")
+
 ;primitivas unarias
 (scan&parse "sub1(4)")
 (scan&parse "add1(2)")
 (scan&parse "add1(x8)(x8(2))")
 (scan&parse "add1(x16)(x16(14))")
 (scan&parse "add1(x16)(x16(0 1))")
+
 ;primitivas sobre cadenas
 (scan&parse "sub1(4)")
+
 ;invocacion de procedimientos
 (scan&parse "function (a,b){(a+b)}")
+
 ;funciones booleanas
 (scan&parse "> (3,5)")
 (scan&parse "< (4,2)")
@@ -1085,6 +1083,7 @@
 (scan&parse "or(true,false)")
 (scan&parse "and(true,true)")
 (scan&parse "not(true)")
+
 ;funcion print
 (scan&parse "print(true)")
 
@@ -1093,19 +1092,20 @@
 clase c1 extends object:
   field x
   field y
+  
   define initialize()
     begin
       set x = 1;
       set y = 2
     end
-
+    
   define m1() x
   define m2() y
-
+  
   var
     o1 = new c1()
   in
-
+  
   send o1 m1()
 ")
 
@@ -1114,32 +1114,34 @@ clase c1 extends object:
 clase c1 extends object:
   field x
   field y
+  
   define initialize()
     begin
       set x = 1;
       set y = 2
     end
-
+    
   define m1() x
   define m2() y
-
+  
 clase c2 extends c1:
   field x
   field y
+  
   define initialize()
     begin
       super initialize();
       set x = 2;
       set y = 3
     end
-
+    
   define m1() x
-
+  
   var
     o1 = new c1(),
     o2 = new c2()
   in
-
+  
   send o2 m2()
 ")
 
@@ -1147,40 +1149,42 @@ clase c2 extends c1:
 clase c1 extends object:
   field x
   field y
+  
   define initialize()
     begin
       set x = 1;
       set y = 2
     end
-
+    
   define m1() x
   define m2() y
-
+  
 clase c2 extends c1:
   field x
   field y
+  
   define initialize()
     begin
       super initialize();
       set x = 2;
       set y = 3
     end
-
+    
   define m1() x
-
+  
   var
     o1 = new c1(),
     o2 = new c2()
   in
-
+  
   send o2 m2()
 ")
-
 
 (scan&parse "
 clase c1 extends object:
   field x
   field y
+  
   define initialize()
     begin
       set x = 1;
@@ -1189,19 +1193,20 @@ clase c1 extends object:
   
   define m1() x
   define m2() send self m1()
-
+  
 clase c2 extends c1:
   field x
   field y
+  
   define initialize()
     begin
       super initialize();
       set x = 9;
       set y = 10
     end
-
+    
   define m1() x
-
+  
 var
   o1 = new c1(),
   o2 = new c2()
