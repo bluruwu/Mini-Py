@@ -49,7 +49,7 @@
 
     ;Constructores de datos predefinidos
     (expresion ("["(separated-list expresion ",")"]" ) list-exp)
-    (expresion ("tupla" "[" (separated-list expresion ";") "]" ) tupla-exp)
+    (expresion ("tupla" "[" (separated-list expresion ",") "]" ) tupla-exp)
     (expresion ("{" identificador "=" expresion (arbno "," identificador "=" expresion)"}" ) registro-exp)
     (expr-bool (pred-prim "(" expresion "," expresion ")") pred-prim-exp) ;DrRacket
     (expr-bool (oper-bin-bool "(" expr-bool "," expr-bool ")") oper-bin-exp) ;DrRacket
@@ -82,6 +82,7 @@
     (expresion ("crear-lista" "(" expresion (arbno "," expresion) ")" ) crear-lista-exp)
     (expresion ("lista?" "(" expresion ")") list?-exp)
     (expresion ("cabeza" "(" expresion ")") cabeza-exp)
+    
     (expresion ("cola" "(" expresion ")") cola-exp)
     (expresion ("append" "(" expresion "," expresion ")") append-exp)
     (expresion ("ref-list" "(" expresion "," expresion ")") ref-list-exp)
@@ -91,7 +92,8 @@
     (expresion ("crear-tupla" "(" expresion (arbno "," expresion) ")" ) crear-tupla-exp)
     (expresion ("tupla?" "(" expresion ")") tupla?-exp)
     (expresion ("ref-tupla" "(" expresion "," expresion ")" ) ref-tupla-exp)
-    
+    (expresion ("cabeza-tupla""("expresion")") cabeza-tupla-exp)
+    (expresion ("cola-tupla""(" expresion")")cola-tupla-exp)
     ;Primitivas sobre registros
     (expresion ("registro?" "(" expresion ")") registro?-exp)
     (expresion ("crear-registro" "(" identificador "=" expresion (arbno "," identificador "=" expresion) ")" ) crear-registro-exp)
@@ -126,7 +128,7 @@
     (primitiva-binaria ("~") primitiva-resta) 
     (primitiva-binaria ("*") primitiva-multi)
     (primitiva-binaria ("/") primitiva-div)
-    (primitiva-binaria ("%") primitiva-mod) 
+    (primitiva-binaria ("%") primitiva-mod)
     (primitiva-unaria ("add1") primitiva-add1)
     (primitiva-unaria ("sub1") primitiva-sub1)
     ;octales
@@ -276,7 +278,7 @@
       (vacio-exp () '())
       (vacio?-exp (list) (eqv? (evaluar-expresion list env) '()))
       (list?-exp (list) (list? (evaluar-expresion list env)))
-      (cabeza-exp (list) (car (evaluar-expresion list env)) )
+      (cabeza-exp (list) (car (evaluar-expresion list env)))
       (cola-exp (list) (cdr (evaluar-expresion list env)))
       (append-exp (list1 list2)
                  (append (evaluar-expresion list1 env) (evaluar-expresion list2 env)))
@@ -324,12 +326,15 @@
                          )
                )
       ;Tuplas
+      (tupla-exp (list) (list->vector (map (lambda (arg) (evaluar-expresion arg env)  ) list )))
       (crear-tupla-exp (head tail)
                        (list->vector (map (lambda (arg) (evaluar-expresion arg env)  ) (cons head tail)))
                        )
       (tupla?-exp (body) (vector? (evaluar-expresion body env)))
       (ref-tupla-exp (tupla index)
                      (vector-ref (evaluar-expresion tupla env) (evaluar-expresion index env)))
+      (cabeza-tupla-exp (tupla)(car (vector->list (evaluar-expresion tupla env))))
+      (cola-tupla-exp (tupla) (list->vector (cdr (vector->list (evaluar-expresion tupla env)))))
       ;Imprimir
       (print-exp (txt) (display (evaluar-expresion txt env)) (newline))
       ;procedimientos
@@ -841,6 +846,10 @@
 (scan&parse "crear-tupla(2,3,4,5,6)")
 (scan&parse "tupla?(crear-tupla(2,3,4,5,6))")
 (scan&parse "ref-tupla(crear-tupla(2,3,4,5,6),3)")
+(scan&parse "cabeza-tupla(tupla[2,3,4,5])")
+(scan&parse "cabeza-tupla(crear-tupla[2,3,4,5])")
+(scan&parse "cola-tupla(crear-tupla(2,3,4,5))")
+(scan&parse "cola-tupla(tupla[2,3,4,5])")
 
 
 ;registros
