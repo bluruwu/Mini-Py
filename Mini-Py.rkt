@@ -102,7 +102,7 @@
 
     ;Invocación de procedimientos
     (expresion ("function" "("(separated-list identificador",")")" "{" expresion "}") procedimiento-exp) ;javascript
-    (expresion ("evaluar" expresion "("  (arbno expresion) ")") evaluar-exp) ;java
+    (expresion ("evaluar" expresion "(" (separated-list expresion ",") ")") evaluar-exp) ;java
     (expresion ("&" identificador) referencia-exp)
      
     ;Variables actualizables
@@ -843,6 +843,9 @@
 ;por referencia
 (scan&parse "const @p = function(@r) {set @r = 6} in var @f = 2 in begin evaluar @p(&@f); @f end")
 
+;procedimientos recursivos
+(scan&parse "rec @productoria(@n,@m) = if ==(@m,@n) : @n else :(@m * evaluar @productoria(@n,sub1(@m))) end in evaluar @productoria(1,5)")
+
 ;listas
 (scan&parse "crear-lista(5,4,3)") ;crear lista
 (scan&parse "var @y = crear-lista(1,2,3) in set-list(@y,1,8)") ;set list
@@ -911,5 +914,5 @@
 (scan&parse "not(true)")
 ;funcion print
 (scan&parse "print(true)")
-;
+
 
