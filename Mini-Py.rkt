@@ -859,7 +859,7 @@
 (scan&parse "tupla?(crear-tupla(2,3,4,5,6))")
 (scan&parse "ref-tupla(crear-tupla(2,3,4,5,6),3)")
 (scan&parse "cabeza-tupla(tupla[2,3,4,5])")
-(scan&parse "cabeza-tupla(crear-tupla[2,3,4,5])")
+(scan&parse "cabeza-tupla(crear-tupla(2,3,4,5))")
 (scan&parse "cola-tupla(crear-tupla(2,3,4,5))")
 (scan&parse "cola-tupla(tupla[2,3,4,5])")
 
@@ -872,16 +872,15 @@
 
 
 ;;;;estructuras de control
-(scan&parse "begin ; end")
-(scan&parse "if <(3,5) : (6+7) else : (7-6) end")
-(scan&parse "while : done")
+(scan&parse "if <(3,5) : (6+7) else : (7~6) end")
+(scan&parse "while true :print (true) done ")
 (scan&parse "for(@hw = 5 to 10 ){ print(5) }")
 ;operaciones aritmeticas
 (scan&parse "(1 + 1)")
 (scan&parse "(1 ~ 2)")
 (scan&parse "(1 * 2)")
 (scan&parse "(1 / 2)")
-(scan&parse "(4 % 2")
+(scan&parse "(4 % 2)")
 (scan&parse "(x8(3) +(x8) x8(4))")
 (scan&parse "(x16(15 5) +(x16) x16(10 3))")
 (scan&parse "(x32(23) +(x32) x32(4))")
@@ -890,22 +889,21 @@
 (scan&parse "(x32(14 3) *(x32) x32(24))")
 (scan&parse "(x8(7) ~(x8) x8(4))")
 (scan&parse "(x16(15) ~(x16) x16(15))")
-(scan&parse "(x32(3) ~(x32) x32(31))")
+(scan&parse "(x32(31) ~(x32) x32(3))")
 ;primitivas unarias
 (scan&parse "sub1(4)")
 (scan&parse "add1(2)")
 (scan&parse "add1(x8)(x8(2))")
 (scan&parse "add1(x16)(x16(14))")
-(scan&parse "add1(x16)(x16(26))")
+(scan&parse "add1(x16)(x16(0 1))")
 ;primitivas sobre cadenas
 (scan&parse "sub1(4)")
 ;invocacion de procedimientos
 (scan&parse "function (@a,@b){(@a+@b)}")
-(scan&parse "evaluar ( (1+2) )")
-;weas de verdadero o falso
+;funciones booleanas
 (scan&parse "> (3,5)")
 (scan&parse "< (4,2)")
-(scan&parse ">= (6,8)")
+(scan&parse "<= (6,8)")
 (scan&parse ">= (7,9)")
 (scan&parse "== (7,7)")
 (scan&parse "!= (2,0)")
