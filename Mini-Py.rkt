@@ -14,7 +14,7 @@
 '(
   (white-sp (whitespace) skip)
   (comentario ("//" (arbno (not #\newline))) skip)
-  (identificador (letter (arbno (or letter digit))) symbol)
+  (identificador (letter (arbno (or letter digit "?"))) symbol)
   (cadena (#\" any (arbno (not #\")) #\") string)
   (numero (digit (arbno digit)) number)
   (numero ("-" digit (arbno digit)) number)
@@ -557,7 +557,7 @@
         (if (eval-expr-bool expr-bool env)
             (begin (evaluar-expresion body env)
                    (while expr-bool body env))
-             1)))
+             'done)))
 
 ;for
 (define forfunction-verify
@@ -575,7 +575,7 @@
        (evaluar-expresion body env)
        (forfunction-up var (+ 1 val) x body env )
        )
-     1)
+     'done-for)
   ))
 
 (define forfunction-down
