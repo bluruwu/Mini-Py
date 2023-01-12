@@ -99,7 +99,7 @@
 
     ;Invocación de procedimientos
     (expresion ("function" "("(separated-list identificador",")")" "{" expresion "}") procedimiento-exp) ;javascript
-    (expresion ("evaluar" expresion "("  (arbno expresion) ")") evaluar-exp) ;java
+    (expresion ("evaluar" expresion "(" (separated-list expresion ",") ")") evaluar-exp) ;java
     (expresion ("&" identificador) referencia-exp)
 
     ;Variables actualizables
