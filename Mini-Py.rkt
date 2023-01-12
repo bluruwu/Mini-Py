@@ -353,6 +353,30 @@
       (else (eopl:error 'invalid-register "No es un indice de registro valido"))
       )))
 
+
+
+;extend-env-recursively: <list-of symbols> <list-of <list-of symbols>> <list-of expressions> environment -> environment
+;función que crea un ambiente extendido para procedimientos recursivos
+(define extend-env-recursively
+  (lambda (proc-names idss bodies old-env)
+    (let ((len (length proc-names)))
+      (let ((vec (make-vector len)))
+        (let ((env (extended-env-record proc-names vec old-env)))
+          (for-each
+            (lambda (pos ids body)
+              (vector-set! vec pos (direct-target (cerradura ids body env))))
+            (iota len) idss bodies)
+          env)))))
+
+;iota: number -> list
+;función que retorna una lista de los números desde 0 hasta end
+(define iota
+  (lambda (end)
+    (let loop ((next 0))
+      (if (>= next end) '()
+        (cons next (loop (+ 1 next)))))))
+
+
 ;apply-primitive-bin: <expresion> <primitiva> <expresion> -> numero
 (define apply-primitive-bin
   (lambda (prim args1 args2)
@@ -615,12 +639,7 @@
   (extended-env-record
    (syms (list-of symbol?))
    (vec vector?)
-   (env environment?))
-  (extend-env-recursively
-                        (proc-names (list-of symbol?))
-                        (idss (list-of (list-of symbol?)))
-                        (bodies (list-of expresion?))
-                        (env environment?)))
+   (env environment?)))
 
 (define scheme-value? (lambda (v) #t))
 
@@ -645,15 +664,7 @@
                            (let ((pos (rib-find-position sym syms)))
                              (if (number? pos)
                                  (a-ref pos vals)
-                                 (apply-env-ref env sym))))
-      (extend-env-recursively (proc-names idss bodies env)
-                              (let ((pos (rib-find-position sym proc-names)))
-                                (if (number? pos)
-                                    (make-ref
-                                     (cerradura (list-ref idss pos)
-                                                (list-ref bodies pos)
-                                                env))
-                                    (apply-env-ref env sym)))))))
+                                 (apply-env-ref env sym)))))))
 
 ; Ambiente inicial
 (define init-env  
@@ -691,8 +702,6 @@
                 (+ list-index-r 1)
                 #f))))))
   
-(define make-ref(lambda val
-    (a-ref 0 (vector (direct-target (car val))))))
 
 ;***********************************************numeros no decimales*************************
 ;operaciones aritmeticas para numeros no decimales
